@@ -192,6 +192,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
+            // SNAPSHOT CONTEXT BEFORE SYNCING
+            // Find the most relevant editor (active one, or first visible file)
+            let activeEditor = vscode.window.activeTextEditor;
+            if (!activeEditor || activeEditor.document.uri.scheme !== 'file') {
+                activeEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.scheme === 'file');
+            }
+
+            const preSyncDiff = await promptGenerator.getGitDiff(repoDetails.repo);
+            let selectedContextPath: string | undefined;
+            
             // 2. Handle Dirty State
             if (repoDetails.isDirty) {
                 const config = vscode.workspace.getConfiguration('julesBridge');
@@ -227,7 +237,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // 3. Select Conversation Context
             const availableContexts = await promptGenerator.getAvailableContexts();
-            let selectedContextPath: string | undefined;
 
             const items: vscode.QuickPickItem[] = availableContexts.map(ctx => {
                 const date = new Date(ctx.time);
@@ -272,8 +281,9 @@ export async function activate(context: vscode.ExtensionContext) {
             // 4. Auto-generate context-aware prompt
             const autoPrompt = await promptGenerator.generatePrompt(
                 repoDetails.repo,
-                vscode.window.activeTextEditor,
-                selectedContextPath
+                activeEditor,
+                selectedContextPath,
+                preSyncDiff
             );
 
             const workspaceFolders = vscode.workspace.workspaceFolders;

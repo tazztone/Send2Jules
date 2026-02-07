@@ -49,7 +49,7 @@ suite('PromptGenerator Test Suite', () => {
             }
         } as unknown as Repository;
 
-        const prompt = await promptGenerator.generatePrompt(repo);
+        const prompt = await promptGenerator.generatePrompt(repo, undefined, undefined, undefined);
 
         // Check for XML structure
         assert.ok(prompt.includes('<instruction>'));
@@ -68,7 +68,7 @@ suite('PromptGenerator Test Suite', () => {
             }
         } as unknown as Repository;
 
-        const prompt = await promptGenerator.generatePrompt(repo);
+        const prompt = await promptGenerator.generatePrompt(repo, undefined, undefined, undefined);
         assert.ok(prompt.includes('<git_diff>'));
         // In the test, relative path might just be the full path if workspaceFolders is empty
         assert.ok(prompt.includes('Modified:'));
@@ -88,7 +88,7 @@ suite('PromptGenerator Test Suite', () => {
             selection: { active: new vscode.Position(10, 5) }
         } as unknown as vscode.TextEditor;
 
-        const prompt = await promptGenerator.generatePrompt(repo, editorStub);
+        const prompt = await promptGenerator.generatePrompt(repo, editorStub, undefined, undefined);
         assert.ok(prompt.includes('<active_editor>'));
         assert.ok(prompt.includes('Active File: active.ts'));
         assert.ok(prompt.includes('Line 11, Column 6'));
@@ -110,7 +110,7 @@ suite('PromptGenerator Test Suite', () => {
             }
         } as unknown as vscode.TextEditor;
 
-        const prompt = await promptGenerator.generatePrompt(repo, editorStub);
+        const prompt = await promptGenerator.generatePrompt(repo, editorStub, undefined, undefined);
         assert.ok(prompt.includes('User Selection:'));
         assert.ok(prompt.includes('function test()'));
     });
@@ -125,7 +125,7 @@ suite('PromptGenerator Test Suite', () => {
             '# Task List\n- [x] Done task\n- [ ] Pending AI Feature\n- [ ] Another task'
         );
 
-        const prompt = await promptGenerator.generatePrompt(repo);
+        const prompt = await promptGenerator.generatePrompt(repo, undefined, undefined, undefined);
         assert.ok(prompt.includes('<mission_brief>Continue working on: Pending AI Feature</mission_brief>'));
     });
 
@@ -143,7 +143,7 @@ suite('PromptGenerator Test Suite', () => {
         const uri = vscode.Uri.file('/path/to/error.ts');
         (vscode.languages.getDiagnostics as sinon.SinonStub).returns([[uri, [diagnostic]]]);
 
-        const prompt = await promptGenerator.generatePrompt(repo);
+        const prompt = await promptGenerator.generatePrompt(repo, undefined, undefined, undefined);
         assert.ok(prompt.includes('<active_errors>'));
         assert.ok(prompt.includes('File: error.ts Line 1: Error message'));
     });
@@ -178,9 +178,11 @@ suite('PromptGenerator Test Suite', () => {
             return task({ report: () => {} }, new vscode.CancellationTokenSource().token);
         });
 
-        const prompt = await generatorWithGemini.generatePrompt(repo);
+        const prompt = await generatorWithGemini.generatePrompt(repo, undefined, undefined, 'Pre-sync diff summary');
         
         assert.ok(prompt.includes('<mission_brief>AI generated mission brief</mission_brief>'));
         assert.strictEqual(geminiClientStub.summarizeWork.calledOnce, true);
+        assert.strictEqual(geminiClientStub.summarizeWork.firstCall.args[0], 'Pre-sync diff summary');
+        assert.ok(Array.isArray(geminiClientStub.summarizeWork.firstCall.args[3]));
     });
 });

@@ -192,14 +192,15 @@ export class PromptGenerator {
     async generatePrompt(
         repo: Repository, 
         activeEditor?: vscode.TextEditor, 
-        contextPath?: string
+        contextPath?: string,
+        preSyncDiff?: string | null
     ): Promise<string> {
         try {
             // Execute context gathering in parallel
             const [errors, artifacts, diff, activeFileContext, openFiles] = await Promise.all([
                 this.getDiagnostics().catch(e => { this.outputChannel.appendLine(`Diag error: ${e}`); return null; }),
                 this.getArtifacts(contextPath).catch(e => { this.outputChannel.appendLine(`Artifact error: ${e}`); return null; }),
-                this.getGitDiff(repo).catch(e => { this.outputChannel.appendLine(`Git error: ${e}`); return null; }),
+                preSyncDiff !== undefined ? Promise.resolve(preSyncDiff) : this.getGitDiff(repo).catch(e => { this.outputChannel.appendLine(`Git error: ${e}`); return null; }),
                 this.getActiveEditorContext(activeEditor).catch(e => { this.outputChannel.appendLine(`Editor error: ${e}`); return null; }),
                 this.getOpenFilesList().catch(e => { this.outputChannel.appendLine(`Files error: ${e}`); return []; })
             ]);
@@ -215,7 +216,8 @@ export class PromptGenerator {
                         return await this.geminiClient!.summarizeWork(
                             diff, 
                             errors, 
-                            activeEditor?.document.fileName || null
+                            activeEditor?.document.fileName || null,
+                            openFiles
                         ) || undefined;
                     });
                 } catch (e) {
@@ -237,7 +239,7 @@ export class PromptGenerator {
     /**
      * Get Git diff summary for the current repository.
      */
-    private async getGitDiff(repo: Repository): Promise<string | null> {
+    public async getGitDiff(repo: Repository): Promise<string | null> {
         try {
             const changes = [
                 ...repo.state.workingTreeChanges,

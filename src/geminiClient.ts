@@ -11,14 +11,17 @@ export class GeminiClient {
      * Generate a smart summary of the current work based on Git diff and diagnostics.
      * Leverages the internal IDE model via vscode.lm API.
      */
-    async summarizeWork(diff: string | null, errors: string | null, activeFile: string | null): Promise<string | null> {
-        if (!diff && !errors && !activeFile) {
-            this.outputChannel.appendLine("Gemini: No context provided (no diff, errors, or active file)");
+    async summarizeWork(diff: string | null, errors: string | null, activeFile: string | null, openFiles: string[]): Promise<string | null> {
+        this.outputChannel.appendLine(`Gemini: Context Snapshot - Diff: ${diff ? (diff.length + ' chars') : 'none'}, Errors: ${errors ? 'present' : 'none'}, File: ${activeFile || 'none'}, Open Files: ${openFiles.length}`);
+
+        if (!diff && !errors && !activeFile && openFiles.length === 0) {
+            this.outputChannel.appendLine("Gemini: No context provided (no diff, errors, active file, or open files)");
             return null;
         }
 
         try {
             this.outputChannel.appendLine(`Gemini: Selecting built-in model...`);
+            // ... (keep existing model selection code)
 
             // Try to find the Gemini 3 Flash model within the IDE
             let models = await vscode.lm.selectChatModels({
@@ -61,6 +64,9 @@ ${errors || 'No errors'}
 
 ACTIVE FILE:
 ${activeFile || 'None'}
+
+OPEN FILES:
+${openFiles.join('\n') || 'None'}
 
 RESPONSE FORMAT: Just the sentence. No preamble. No "Here is a summary".
 EXAMPLE: "Refactoring the login logic in auth.ts to support JWT validation."`;
