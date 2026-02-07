@@ -80,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext) {
         secrets = new SecretsManager(context);
         gitManager = new GitContextManager(outputChannel);
         julesClient = new JulesClient(secrets);
-        geminiClient = new GeminiClient(secrets);
+        geminiClient = new GeminiClient(secrets, outputChannel);
         promptGenerator = new PromptGenerator(outputChannel, geminiClient);
         outputChannel.appendLine("Managers initialized successfully.");
     } catch (error) {

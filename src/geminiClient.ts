@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { SecretsManager } from './secrets';
 import { ApiError, ConfigurationError } from './errors';
 import { MESSAGES } from './constants';
@@ -8,16 +9,24 @@ import { MESSAGES } from './constants';
 export class GeminiClient {
     private readonly BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
 
-    constructor(private secrets: SecretsManager) { }
+    constructor(private secrets: SecretsManager, private outputChannel: vscode.OutputChannel) { }
 
     /**
      * Generate a smart summary of the current work based on Git diff and diagnostics.
      */
     async summarizeWork(diff: string | null, errors: string | null, activeFile: string | null): Promise<string | null> {
-        if (!diff && !errors && !activeFile) return null;
+        if (!diff && !errors && !activeFile) {
+            this.outputChannel.appendLine("Gemini: No context provided (no diff, errors, or active file)");
+            return null;
+        }
 
         let apiKey = await this.secrets.getKey();
-        if (!apiKey) return null; // Fallback to manual prompt if no key
+        if (!apiKey) {
+            this.outputChannel.appendLine("Gemini: No API key found in secrets");
+            return null; // Fallback to manual prompt if no key
+        }
+
+        this.outputChannel.appendLine(`Gemini: Starting summary generation for ${activeFile || 'unknown file'}`);
 
         const prompt = `You are a developer assistant helping to "handoff" work to an autonomous agent.
 Analyze the following workspace state and summarize what the user is currently working on in ONE CONCISE SENTENCE.

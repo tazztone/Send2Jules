@@ -194,15 +194,18 @@ export class PromptGenerator {
         activeEditor?: vscode.TextEditor, 
         contextPath?: string
     ): Promise<string> {
+        console.log("GENERATE PROMPT CALLED - LOG 1");
         try {
             // Execute context gathering in parallel
+            console.log("LOG: Gathering context...");
             const [errors, artifacts, diff, activeFileContext, openFiles] = await Promise.all([
-                this.getDiagnostics(),
-                this.getArtifacts(contextPath),
-                this.getGitDiff(repo),
-                this.getActiveEditorContext(activeEditor),
-                this.getOpenFilesList()
+                this.getDiagnostics().catch(e => { console.error(`Diag error: ${e}`); return null; }),
+                this.getArtifacts(contextPath).catch(e => { console.error(`Artifact error: ${e}`); return null; }),
+                this.getGitDiff(repo).catch(e => { console.error(`Git error: ${e}`); return null; }),
+                this.getActiveEditorContext(activeEditor).catch(e => { console.error(`Editor error: ${e}`); return null; }),
+                this.getOpenFilesList().catch(e => { console.error(`Files error: ${e}`); return []; })
             ]);
+            console.log("LOG: Context gathered.");
 
             // Optional: Use Gemini to generate a smart summary if client is available
             let smartSummary: string | undefined;
@@ -225,7 +228,8 @@ export class PromptGenerator {
 
             // Assemble XML parts
             return this.assemblePrompt(errors, artifacts, diff, activeFileContext, openFiles, smartSummary);
-        } catch (error) {
+        } catch (error: any) {
+            console.error("GENERATE PROMPT FAILED:", error);
             this.outputChannel.appendLine(`Error generating prompt: ${error}`);
             return `<instruction>Continue working on this project</instruction>
 <workspace_context>
