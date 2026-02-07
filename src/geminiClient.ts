@@ -1,18 +1,15 @@
 import * as vscode from 'vscode';
 import { SecretsManager } from './secrets';
-import { ApiError, ConfigurationError } from './errors';
-import { MESSAGES } from './constants';
 
 /**
- * Client for interacting with the Google Gemini API (Flash) for intelligent drafting.
+ * Client for interacting with the built-in Antigravity Gemini models for intelligent drafting.
  */
 export class GeminiClient {
-    private readonly BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
-
     constructor(private secrets: SecretsManager, private outputChannel: vscode.OutputChannel) { }
 
     /**
      * Generate a smart summary of the current work based on Git diff and diagnostics.
+     * Leverages the internal IDE model via vscode.lm API.
      */
     async summarizeWork(diff: string | null, errors: string | null, activeFile: string | null): Promise<string | null> {
         if (!diff && !errors && !activeFile) {
@@ -20,15 +17,21 @@ export class GeminiClient {
             return null;
         }
 
-        let apiKey = await this.secrets.getKey();
-        if (!apiKey) {
-            this.outputChannel.appendLine("Gemini: No API key found in secrets");
-            return null; // Fallback to manual prompt if no key
-        }
+        try {
+            this.outputChannel.appendLine(`Gemini: Selecting built-in model...`);
 
-        this.outputChannel.appendLine(`Gemini: Starting summary generation for ${activeFile || 'unknown file'}`);
+            // Try to find the Gemini 3 Flash model within the IDE
+            const [model] = await vscode.lm.selectChatModels({
+                vendor: 'google',
+                family: 'gemini-3-flash'
+            });
 
-        const prompt = `You are a developer assistant helping to "handoff" work to an autonomous agent.
+            if (!model) {
+                this.outputChannel.appendLine("Gemini: Built-in Gemini 3 Flash model not found. Falling back to default.");
+                return null;
+            }
+
+            const prompt = `You are a developer assistant helping to "handoff" work to an autonomous agent.
 Analyze the following workspace state and summarize what the user is currently working on in ONE CONCISE SENTENCE.
 The summary will be used as a "mission brief" for the agent.
 
@@ -44,30 +47,26 @@ ${activeFile || 'None'}
 RESPONSE FORMAT: Just the sentence. No preamble. No "Here is a summary".
 EXAMPLE: "Refactoring the login logic in auth.ts to support JWT validation."`;
 
-        const payload = {
-            contents: [{
-                parts: [{ text: prompt }]
-            }],
-            generationConfig: {
-                maxOutputTokens: 100,
-                temperature: 0.1
+            const request = await model.sendRequest([
+                vscode.LanguageModelChatMessage.User(prompt)
+            ], {}, new vscode.CancellationTokenSource().token);
+
+            let responseText = '';
+            for await (const fragment of request.text) {
+                responseText += fragment;
             }
-        };
 
-        try {
-            const response = await fetch(`${this.BASE_URL}?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const summary = responseText.trim();
+            if (!summary) {
+                this.outputChannel.appendLine("Gemini: IDE model returned empty response");
+                return null;
+            }
 
-            if (!response.ok) return null;
+            this.outputChannel.appendLine(`Gemini: Successfully generated summary: "${summary}"`);
+            return summary;
 
-            const data = await response.json() as any;
-            const summary = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-            return summary ? summary.trim() : null;
-        } catch (e) {
+        } catch (e: any) {
+            this.outputChannel.appendLine(`Gemini Internal Request Failed: ${e.message}`);
             return null;
         }
     }
