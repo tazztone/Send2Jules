@@ -19,6 +19,15 @@
         "vscode.git",
         "google.antigravity"
     ],
+    "capabilities": {
+        "virtualWorkspaces": true,
+        "untrustedWorkspaces": {
+            "supported": true
+        },
+        "languageModels": {
+            "supported": true
+        }
+    },
     "enabledApiProposals": [
         "languageModels"
     ],
