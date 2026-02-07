@@ -47,21 +47,41 @@ export interface RepoDetails {
  * Uses VS Code's built-in Git extension API to interact with repositories.
  */
 export class GitContextManager {
-    private gitApi: GitAPI;
+    private gitApi: GitAPI | undefined;
     private outputChannel: vscode.OutputChannel;
 
     /**
      * Creates a new GitContextManager instance.
      * 
      * @param outputChannel - VS Code output channel for logging
-     * @throws Error if Git extension is not enabled
      */
     constructor(outputChannel: vscode.OutputChannel) {
         this.outputChannel = outputChannel;
-        // Consume the built-in Git extension API
+    }
+
+    /**
+     * Internal helper to ensure Git API is initialized.
+     * 
+     * @returns GitAPI instance
+     * @throws Error if Git extension is not enabled
+     * @private
+     */
+    private async ensureGitApi(): Promise<GitAPI> {
+        if (this.gitApi) return this.gitApi;
+
         const extension = vscode.extensions.getExtension<GitExtension>('vscode.git');
-        if (!extension) throw new Error("Git extension not enabled.");
-        this.gitApi = extension.exports.getAPI(1); // Use API version 1
+        if (!extension) {
+            throw new Error("Git extension not found.");
+        }
+
+        if (!extension.isActive) {
+            this.outputChannel.appendLine("Activating Git extension...");
+            await extension.activate();
+        }
+
+        const api = extension.exports.getAPI(1);
+        this.gitApi = api;
+        return api;
     }
 
     /**
@@ -89,18 +109,19 @@ export class GitContextManager {
      * ```
      */
     async getRepositoryDetails(): Promise<RepoDetails | undefined> {
+        const api = await this.ensureGitApi();
         let repo: Repository | undefined;
 
         // 1. Try to get repo from active file
         if (vscode.window.activeTextEditor) {
             const uri = vscode.window.activeTextEditor.document.uri;
-            repo = this.gitApi.getRepository(uri) || undefined;
+            repo = api.getRepository(uri) || undefined;
         }
 
         // 2. Fallback: Try to get repo from workspace folders
         if (!repo && vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
             for (const folder of vscode.workspace.workspaceFolders) {
-                const folderRepo = this.gitApi.getRepository(folder.uri);
+                const folderRepo = api.getRepository(folder.uri);
                 if (folderRepo) {
                     repo = folderRepo;
                     break;
