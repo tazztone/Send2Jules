@@ -157,8 +157,14 @@ suite('PromptGenerator Test Suite', () => {
             summarizeWork: sandbox.stub().resolves('AI generated mission brief')
         };
 
-        // Create a new generator with the stub
-        const generatorWithGemini = new PromptGenerator(outputChannelStub as any, geminiClientStub as any);
+        // Create a dedicated stub for outputChannel to ensure it doesn't crash
+        const localOutputChannel = {
+            appendLine: sandbox.stub(),
+            append: sandbox.stub()
+        } as any;
+
+        // Create a new generator with the stubs
+        const generatorWithGemini = new PromptGenerator(localOutputChannel, geminiClientStub as any);
 
         // Ensure all context methods return something to avoid catch block
         sandbox.stub(generatorWithGemini as any, 'getArtifacts').resolves(null);
@@ -173,10 +179,6 @@ suite('PromptGenerator Test Suite', () => {
         });
 
         const prompt = await generatorWithGemini.generatePrompt(repo);
-        
-        if (!prompt.includes('AI generated mission brief')) {
-            console.log("PROMPT DEBUG:", prompt);
-        }
         
         assert.ok(prompt.includes('<mission_brief>AI generated mission brief</mission_brief>'));
         assert.strictEqual(geminiClientStub.summarizeWork.calledOnce, true);

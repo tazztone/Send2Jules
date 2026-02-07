@@ -226,7 +226,6 @@ export class PromptGenerator {
             // Assemble XML parts
             return this.assemblePrompt(errors, artifacts, diff, activeFileContext, openFiles, smartSummary);
         } catch (error: any) {
-            console.error("GENERATE PROMPT FAILED:", error);
             this.outputChannel.appendLine(`Error generating prompt: ${error}`);
             return `<instruction>Continue working on this project</instruction>
 <workspace_context>

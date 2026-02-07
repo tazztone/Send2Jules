@@ -213,20 +213,35 @@ export class GitContextManager {
             await repo.commit(message);
             this.outputChannel.appendLine("Commit successful.");
 
-            // 3. Create and push to a new unique branch
+            // 3. Create and push to a new branch
             const remoteName = repo.state.remotes[0]?.name || 'origin';
             const branchSafeTimestamp = timestamp.replace(GIT_CONFIG.BRANCH_SAFE_CHARS_PATTERN, GIT_CONFIG.BRANCH_SAFE_REPLACEMENT);
-            const newBranchName = GIT_CONFIG.WIP_BRANCH_NAME(branchSafeTimestamp);
+            
+            // Determine branch name based on configuration
+            const config = vscode.workspace.getConfiguration('julesBridge');
+            const usePersistentBranch = config.get('usePersistentBranch', false);
+            const newBranchName = usePersistentBranch 
+                ? 'jules-handoff' 
+                : GIT_CONFIG.WIP_BRANCH_NAME(branchSafeTimestamp);
 
-            this.outputChannel.appendLine(`Creating and pushing to new branch: ${remoteName}/${newBranchName}...`);
+            this.outputChannel.appendLine(`Creating and pushing to branch: ${remoteName}/${newBranchName}...`);
 
             // Save the current branch to return to it later
             const originalBranch = repo.state.HEAD?.name;
 
+            // If using persistent branch, try to delete local one first if it exists but is not checked out
+            if (usePersistentBranch && originalBranch !== newBranchName) {
+                try {
+                    await repo.deleteBranch(newBranchName, true);
+                } catch (e) {
+                    // Ignore error if branch doesn't exist
+                }
+            }
+
             // Create and checkout new branch
             await repo.createBranch(newBranchName, true);
 
-            // Push the new branch to remote with upstream tracking
+            // Push the branch to remote with upstream tracking
             await repo.push(remoteName, newBranchName, true);
             this.outputChannel.appendLine("Push complete.");
 
