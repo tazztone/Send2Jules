@@ -73,7 +73,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const antigravityDetector = new AntigravityDetector();
     if (!antigravityDetector.isAntigravityEnvironment()) {
         const warningMessage = antigravityDetector.getWarningMessage();
-        outputChannel.appendLine(`[ERROR] ${warningMessage}`);
+        outputChannel.appendLine(`[WARNING] ${warningMessage}`);
         
         vscode.window.showWarningMessage(warningMessage, MESSAGES.LEARN_MORE).then(selection => {
             if (selection === MESSAGES.LEARN_MORE) {
@@ -85,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
             }
         });
-        return;
+        // Remove early return to ensure commands are always registered
     }
 
     const secrets = new SecretsManager(context);
