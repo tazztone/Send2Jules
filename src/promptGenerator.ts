@@ -194,25 +194,22 @@ export class PromptGenerator {
         activeEditor?: vscode.TextEditor, 
         contextPath?: string
     ): Promise<string> {
-        console.log("GENERATE PROMPT CALLED - LOG 1");
         try {
             // Execute context gathering in parallel
-            console.log("LOG: Gathering context...");
             const [errors, artifacts, diff, activeFileContext, openFiles] = await Promise.all([
-                this.getDiagnostics().catch(e => { console.error(`Diag error: ${e}`); return null; }),
-                this.getArtifacts(contextPath).catch(e => { console.error(`Artifact error: ${e}`); return null; }),
-                this.getGitDiff(repo).catch(e => { console.error(`Git error: ${e}`); return null; }),
-                this.getActiveEditorContext(activeEditor).catch(e => { console.error(`Editor error: ${e}`); return null; }),
-                this.getOpenFilesList().catch(e => { console.error(`Files error: ${e}`); return []; })
+                this.getDiagnostics().catch(e => { this.outputChannel.appendLine(`Diag error: ${e}`); return null; }),
+                this.getArtifacts(contextPath).catch(e => { this.outputChannel.appendLine(`Artifact error: ${e}`); return null; }),
+                this.getGitDiff(repo).catch(e => { this.outputChannel.appendLine(`Git error: ${e}`); return null; }),
+                this.getActiveEditorContext(activeEditor).catch(e => { this.outputChannel.appendLine(`Editor error: ${e}`); return null; }),
+                this.getOpenFilesList().catch(e => { this.outputChannel.appendLine(`Files error: ${e}`); return []; })
             ]);
-            console.log("LOG: Context gathered.");
 
             // Optional: Use Gemini to generate a smart summary if client is available
             let smartSummary: string | undefined;
             if (this.geminiClient) {
                 try {
                     smartSummary = await vscode.window.withProgress({
-                        location: vscode.ProgressLocation.Window,
+                        location: vscode.ProgressLocation.Notification,
                         title: "Gemini 3 Flash Preview is drafting your mission brief..."
                     }, async () => {
                         return await this.geminiClient!.summarizeWork(
