@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 
 export interface GitExtension {
     getAPI(version: 1): API;
+    isActive: boolean;
+    activate(): Promise<void>;
 }
 
 export interface API {
@@ -16,6 +18,7 @@ export interface Repository {
     push(remoteName?: string, branchName?: string, setUpstream?: boolean): Promise<void>;
     createBranch(name: string, checkout: boolean, ref?: string): Promise<void>;
     checkout(treeish: string): Promise<void>;
+    deleteBranch(name: string, force?: boolean): Promise<void>;
 }
 
 export interface RepositoryState {

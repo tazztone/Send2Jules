@@ -18,6 +18,9 @@
     "extensionDependencies": [
         "vscode.git"
     ],
+    "enabledApiProposals": [
+        "languageModels"
+    ],
     "activationEvents": [
         "workspaceContains:.git",
         "onCommand:julesBridge.sendFlow",
@@ -70,6 +73,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Automatically commit and push WIP changes before sending to Jules."
+                },
+                "julesBridge.usePersistentBranch": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use a persistent 'jules-handoff' branch instead of creating a new branch for every session."
                 }
             }
         }

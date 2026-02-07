@@ -187,21 +187,23 @@ export class PromptGenerator {
      * @param repo - Git repository object
      * @param activeEditor - Currently active text editor
      * @param contextPath - Specific conversation context path to use (optional, defaults to latest)
+     * @param preSyncDiff - Previously captured diff summary (optional)
      * @returns Generated prompt string ready for Jules API
      */
     async generatePrompt(
         repo: Repository, 
         activeEditor?: vscode.TextEditor, 
-        contextPath?: string
+        contextPath?: string,
+        preSyncDiff?: string | null
     ): Promise<string> {
         try {
             // Execute context gathering in parallel
             const [errors, artifacts, diff, activeFileContext, openFiles] = await Promise.all([
-                this.getDiagnostics(),
-                this.getArtifacts(contextPath),
-                this.getGitDiff(repo),
-                this.getActiveEditorContext(activeEditor),
-                this.getOpenFilesList()
+                this.getDiagnostics().catch(e => { this.outputChannel.appendLine(`Diag error: ${e}`); return null; }),
+                this.getArtifacts(contextPath).catch(e => { this.outputChannel.appendLine(`Artifact error: ${e}`); return null; }),
+                preSyncDiff !== undefined ? Promise.resolve(preSyncDiff) : this.getGitDiff(repo).catch(e => { this.outputChannel.appendLine(`Git error: ${e}`); return null; }),
+                this.getActiveEditorContext(activeEditor).catch(e => { this.outputChannel.appendLine(`Editor error: ${e}`); return null; }),
+                this.getOpenFilesList().catch(e => { this.outputChannel.appendLine(`Files error: ${e}`); return []; })
             ]);
 
             // Optional: Use Gemini to generate a smart summary if client is available
@@ -209,13 +211,14 @@ export class PromptGenerator {
             if (this.geminiClient) {
                 try {
                     smartSummary = await vscode.window.withProgress({
-                        location: vscode.ProgressLocation.Window,
+                        location: vscode.ProgressLocation.Notification,
                         title: "Gemini 3 Flash Preview is drafting your mission brief..."
                     }, async () => {
                         return await this.geminiClient!.summarizeWork(
                             diff, 
                             errors, 
-                            activeEditor?.document.fileName || null
+                            activeEditor?.document.fileName || null,
+                            openFiles
                         ) || undefined;
                     });
                 } catch (e) {
@@ -225,7 +228,7 @@ export class PromptGenerator {
 
             // Assemble XML parts
             return this.assemblePrompt(errors, artifacts, diff, activeFileContext, openFiles, smartSummary);
-        } catch (error) {
+        } catch (error: any) {
             this.outputChannel.appendLine(`Error generating prompt: ${error}`);
             return `<instruction>Continue working on this project</instruction>
 <workspace_context>
@@ -237,7 +240,7 @@ export class PromptGenerator {
     /**
      * Get Git diff summary for the current repository.
      */
-    private async getGitDiff(repo: Repository): Promise<string | null> {
+    public async getGitDiff(repo: Repository): Promise<string | null> {
         try {
             const changes = [
                 ...repo.state.workingTreeChanges,
@@ -572,12 +575,12 @@ export class PromptGenerator {
         smartSummary?: string
     ): string {
         const instruction = "You are an expert software engineer. You are working on a WIP branch. Please run `git status` and `git diff` to understand the changes and the current state of the code. Analyze the workspace context and complete the mission brief.";
-        const missionBrief = this.summarizeCurrentIntent(artifacts, activeFileContext, diff, smartSummary);
+        const mission_brief = this.summarizeCurrentIntent(artifacts, activeFileContext, diff, smartSummary);
 
         const maxLen = VALIDATION.PROMPT_MAX_LENGTH;
 
         const baseStart = `<instruction>${instruction}</instruction>\n<workspace_context>\n`;
-        const baseEnd = `</workspace_context>\n<mission_brief>${missionBrief}</mission_brief>`;
+        const baseEnd = `</workspace_context>\n<mission_brief>${mission_brief}</mission_brief>`;
 
         // Calculate available budget for context
         let currentLen = baseStart.length + baseEnd.length;
