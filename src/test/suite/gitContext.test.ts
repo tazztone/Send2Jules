@@ -30,6 +30,8 @@ suite('GitContextManager Test Suite', () => {
         };
 
         gitExtensionStub = {
+            isActive: true,
+            activate: sandbox.stub().resolves(),
             exports: {
                 getAPI: sandbox.stub().returns(gitApiStub)
             }
