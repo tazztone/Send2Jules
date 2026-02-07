@@ -146,4 +146,35 @@ suite('PromptGenerator Test Suite', () => {
         assert.ok(prompt.includes('<active_errors>'));
         assert.ok(prompt.includes('File: error.ts Line 1: Error message'));
     });
+
+    test('generatePrompt - with Gemini smart summary', async () => {
+        const repo = {
+            state: { workingTreeChanges: [], indexChanges: [] }
+        } as unknown as Repository;
+
+        const geminiClientStub = {
+            summarizeWork: sandbox.stub().resolves('AI generated mission brief')
+        };
+
+        // Create a new generator with the stub
+        const generatorWithGemini = new PromptGenerator(outputChannelStub as any, geminiClientStub as any);
+
+        // Ensure all context methods return something to avoid catch block
+        sandbox.stub(generatorWithGemini as any, 'getArtifacts').resolves(null);
+        sandbox.stub(generatorWithGemini as any, 'getDiagnostics').resolves(null);
+        sandbox.stub(generatorWithGemini as any, 'getGitDiff').resolves(null);
+        sandbox.stub(generatorWithGemini as any, 'getActiveEditorContext').resolves(null);
+        sandbox.stub(generatorWithGemini as any, 'getOpenFilesList').resolves([]);
+
+        // Mock withProgress to just run the task
+        sandbox.stub(vscode.window, 'withProgress').callsFake((options, task) => {
+            return task({ report: () => {} }, new vscode.CancellationTokenSource().token);
+        });
+
+        const prompt = await generatorWithGemini.generatePrompt(repo, undefined, undefined, 'Pre-sync diff summary');
+        
+        assert.ok(prompt.includes('<mission_brief>AI generated mission brief</mission_brief>'));
+        assert.strictEqual(geminiClientStub.summarizeWork.calledOnce, true);
+        assert.strictEqual(geminiClientStub.summarizeWork.firstCall.args[0], 'Pre-sync diff summary');
+    });
 });

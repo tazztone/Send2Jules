@@ -172,6 +172,8 @@ export const MESSAGES = {
     CONTEXT_PICKER_TITLE: 'Select Conversation Context',
     LATEST_CONTEXT_LABEL: '$(clock) Latest Conversation',
     LATEST_CONTEXT_DESCRIPTION: 'Automatically use the most recent context',
+    NEW_CONTEXT_LABEL: 'Start New Conversation',
+    NEW_CONTEXT_DESCRIPTION: 'Bypass previous context and start fresh',
 
     // Input Box
     PROMPT_INPUT_TITLE: 'Jules Mission Brief',

@@ -192,6 +192,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
+            // SNAPSHOT CONTEXT BEFORE SYNCING
+            // Find the most relevant editor (active one, or first visible file)
+            let activeEditor = vscode.window.activeTextEditor;
+            if (!activeEditor || activeEditor.document.uri.scheme !== 'file') {
+                activeEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.scheme === 'file');
+            }
+
+            const preSyncDiff = await promptGenerator.getGitDiff(repoDetails.repo);
+            let selectedContextPath: string | undefined;
+
             // 2. Handle Dirty State
             if (repoDetails.isDirty) {
                 const config = vscode.workspace.getConfiguration('julesBridge');
@@ -227,26 +237,35 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // 3. Select Conversation Context
             const availableContexts = await promptGenerator.getAvailableContexts();
-            let selectedContextPath: string | undefined;
 
-            if (availableContexts.length > 1) {
-                const items = availableContexts.map(ctx => {
-                    const date = new Date(ctx.time);
-                    return {
-                        label: ctx.title,
-                        description: date.toLocaleString(),
-                        detail: ctx.name,
-                        path: ctx.path
-                    };
-                });
+            const items: any[] = availableContexts.map(ctx => {
+                const date = new Date(ctx.time);
+                return {
+                    label: ctx.title,
+                    description: date.toLocaleString(),
+                    detail: ctx.name,
+                    path: ctx.path
+                };
+            });
 
+            // Add "New" and "Latest" options
+            items.unshift({
+                label: `$(plus) ${MESSAGES.NEW_CONTEXT_LABEL}`,
+                description: MESSAGES.NEW_CONTEXT_DESCRIPTION,
+                path: undefined
+            });
+
+            if (availableContexts.length > 0) {
                 items.unshift({
                     label: MESSAGES.LATEST_CONTEXT_LABEL,
                     description: MESSAGES.LATEST_CONTEXT_DESCRIPTION,
                     detail: "",
                     path: "" 
                 });
+            }
 
+            // Only show picker if there are actually contexts to pick from (more than just "New")
+            if (items.length > 1) {
                 const selection = await vscode.window.showQuickPick(items, {
                     placeHolder: MESSAGES.CONTEXT_PICKER_PLACEHOLDER,
                     title: MESSAGES.CONTEXT_PICKER_TITLE
@@ -254,7 +273,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 if (!selection) return; 
 
-                if (selection.path) {
+                if (selection.hasOwnProperty('path')) {
                     selectedContextPath = selection.path;
                 }
             }
@@ -262,8 +281,9 @@ export async function activate(context: vscode.ExtensionContext) {
             // 4. Auto-generate context-aware prompt
             const autoPrompt = await promptGenerator.generatePrompt(
                 repoDetails.repo,
-                vscode.window.activeTextEditor,
-                selectedContextPath
+                activeEditor,
+                selectedContextPath,
+                preSyncDiff
             );
 
             const workspaceFolders = vscode.workspace.workspaceFolders;

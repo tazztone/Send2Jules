@@ -94,4 +94,35 @@ suite('GitContextManager Test Suite', () => {
         const details = await gitContextManager.getRepositoryDetails();
         assert.strictEqual(details?.isDirty, true);
     });
+
+    test('pushWipChanges - uses persistent branch when configured', async () => {
+        const repoStub = {
+            state: {
+                remotes: [{ name: 'origin' }],
+                HEAD: { name: 'feature-branch' },
+                workingTreeChanges: [{ uri: vscode.Uri.file('/path/to/change.ts') }],
+                indexChanges: []
+            },
+            add: sandbox.stub().resolves(),
+            commit: sandbox.stub().resolves(),
+            createBranch: sandbox.stub().resolves(),
+            push: sandbox.stub().resolves(),
+            checkout: sandbox.stub().resolves(),
+            deleteBranch: sandbox.stub().resolves()
+        };
+
+        // Mock configuration to return true for persistent branch
+        const getStub = sandbox.stub();
+        getStub.withArgs('usePersistentBranch', false).returns(true);
+        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
+            get: getStub
+        } as any);
+
+        await gitContextManager.pushWipChanges(repoStub as any);
+
+        // Check if correct branch name was used
+        assert.ok((repoStub.createBranch as sinon.SinonStub).calledWith('jules-handoff', true));
+        // Check if original branch was restored
+        assert.ok((repoStub.checkout as sinon.SinonStub).calledWith('feature-branch'));
+    });
 });
