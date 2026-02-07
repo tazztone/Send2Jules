@@ -229,24 +229,34 @@ export async function activate(context: vscode.ExtensionContext) {
             const availableContexts = await promptGenerator.getAvailableContexts();
             let selectedContextPath: string | undefined;
 
-            if (availableContexts.length > 1) {
-                const items = availableContexts.map(ctx => {
-                    const date = new Date(ctx.time);
-                    return {
-                        label: ctx.title,
-                        description: date.toLocaleString(),
-                        detail: ctx.name,
-                        path: ctx.path
-                    };
-                });
+            const items: vscode.QuickPickItem[] = availableContexts.map(ctx => {
+                const date = new Date(ctx.time);
+                return {
+                    label: ctx.title,
+                    description: date.toLocaleString(),
+                    detail: ctx.name,
+                    path: ctx.path
+                } as any;
+            });
 
+            // Add "New" and "Latest" options
+            items.unshift({
+                label: `$(plus) ${MESSAGES.NEW_CONTEXT_LABEL || 'Start New Conversation'}`,
+                description: MESSAGES.NEW_CONTEXT_DESCRIPTION || 'Bypass previous context and start fresh',
+                path: undefined
+            } as any);
+
+            if (availableContexts.length > 0) {
                 items.unshift({
                     label: MESSAGES.LATEST_CONTEXT_LABEL,
                     description: MESSAGES.LATEST_CONTEXT_DESCRIPTION,
                     detail: "",
                     path: "" 
-                });
+                } as any);
+            }
 
+            // Only show picker if there are actually contexts to pick from (more than just "New")
+            if (items.length > 1) {
                 const selection = await vscode.window.showQuickPick(items, {
                     placeHolder: MESSAGES.CONTEXT_PICKER_PLACEHOLDER,
                     title: MESSAGES.CONTEXT_PICKER_TITLE
@@ -254,8 +264,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 if (!selection) return; 
 
-                if (selection.path) {
-                    selectedContextPath = selection.path;
+                if (selection.hasOwnProperty('path')) {
+                    selectedContextPath = (selection as any).path;
                 }
             }
 
