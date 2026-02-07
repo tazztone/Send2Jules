@@ -16,7 +16,8 @@
         "Other"
     ],
     "extensionDependencies": [
-        "vscode.git"
+        "vscode.git",
+        "google.antigravity"
     ],
     "enabledApiProposals": [
         "languageModels"

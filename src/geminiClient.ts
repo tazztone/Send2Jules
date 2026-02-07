@@ -26,52 +26,49 @@ export class GeminiClient {
             // Try to find the Gemini 3 Flash model within the IDE
             let models: vscode.LanguageModelChat[] = [];
             
+            this.outputChannel.appendLine(`Gemini: Querying for all available chat models...`);
+            let allModels: vscode.LanguageModelChat[] = [];
             try {
-                models = await vscode.lm.selectChatModels({
-                    vendor: 'google',
-                    family: 'gemini-3-flash'
-                });
+                allModels = await vscode.lm.selectChatModels({});
             } catch (e) {
-                this.outputChannel.appendLine(`Gemini: vscode.lm.selectChatModels failed: ${e}`);
+                this.outputChannel.appendLine(`Gemini: vscode.lm.selectChatModels error: ${e}`);
             }
 
-            // Fallback: If not found, try a broader search and log available models
-            if (models.length === 0) {
-                this.outputChannel.appendLine("Gemini: Preferred model not found via standard API. Searching for Antigravity-specific models...");
+            if (allModels.length === 0) {
+                this.outputChannel.appendLine("Gemini: [IMPORTANT] No models returned. This usually means permissions are missing.");
+                this.outputChannel.appendLine("Gemini: Action Required: Look for a 'Allow Extension' toast in the bottom right, or run 'Antigravity: Manage Extension Permissions'.");
+            } else {
+                this.outputChannel.appendLine(`Gemini: Inspecting ${allModels.length} registered models...`);
                 
-                try {
-                    const allModels = await vscode.lm.selectChatModels({});
-                    if (allModels.length > 0) {
-                        this.outputChannel.appendLine(`Gemini: Found ${allModels.length} models via broad search:`);
-                        for (const m of allModels) {
-                            this.outputChannel.appendLine(` - ID: ${m.id}, Vendor: ${m.vendor}, Family: ${m.family}`);
-                        }
-                        // Use the first available model
-                        models = [allModels[0]];
+                // 1. Strict Priority: Gemini 3 Flash (any vendor/id variation)
+                models = allModels.filter(m => 
+                    (m.id.toLowerCase().includes('gemini-3') || m.family.toLowerCase().includes('gemini-3'))
+                );
+
+                if (models.length > 0) {
+                    this.outputChannel.appendLine(`Gemini: Found ${models.length} Gemini 3 model(s).`);
+                } else {
+                    this.outputChannel.appendLine("Gemini: No Gemini 3 models found. Diagnostics for all available models:");
+                    for (const m of allModels) {
+                        this.outputChannel.appendLine(` - ID: ${m.id}, Vendor: ${m.vendor}, Family: ${m.family}, Name: ${m.name}`);
                     }
-                } catch (e) {
-                    this.outputChannel.appendLine(`Gemini: Broad search failed: ${e}`);
+                    
+                    // 2. Loose Filter: Any Google/Antigravity model that isn't explicitly Gemini 1.5
+                    const broadMatch = allModels.find(m => 
+                        (m.vendor.toLowerCase() === 'google' || m.vendor.toLowerCase() === 'antigravity') &&
+                        (m.family.toLowerCase().includes('gemini') || m.family.toLowerCase().includes('flash')) &&
+                        !m.family.toLowerCase().includes('1.5') && !m.id.toLowerCase().includes('1.5')
+                    );
+
+                    if (broadMatch) {
+                        this.outputChannel.appendLine(`Gemini: Found broad match (non-1.5): ${broadMatch.id}`);
+                        models = [broadMatch];
+                    }
                 }
             }
 
-            // Deep Fallback: Check for google.antigravity extension specifically
             if (models.length === 0) {
-                const agExt = vscode.extensions.getExtension('google.antigravity');
-                this.outputChannel.appendLine(`Gemini: google.antigravity extension state: ${agExt ? 'Found (' + (agExt.isActive ? 'Active' : 'Inactive') + ')' : 'Not Found'}`);
-                
-                if (agExt && !agExt.isActive) {
-                    this.outputChannel.appendLine("Gemini: Activating google.antigravity...");
-                    await agExt.activate();
-                }
-                
-                // Re-try selection after activation
-                try {
-                    models = await vscode.lm.selectChatModels({});
-                } catch (e) {}
-            }
-
-            if (models.length === 0) {
-                this.outputChannel.appendLine("Gemini: No suitable built-in models found. Check 'Proposed APIs' or 'Allow Extension' popups.");
+                this.outputChannel.appendLine("Gemini: No suitable Gemini 3 or compatible models found.");
                 return null;
             }
 
