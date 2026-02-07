@@ -21,15 +21,33 @@ export class GeminiClient {
             this.outputChannel.appendLine(`Gemini: Selecting built-in model...`);
 
             // Try to find the Gemini 3 Flash model within the IDE
-            const [model] = await vscode.lm.selectChatModels({
+            let models = await vscode.lm.selectChatModels({
                 vendor: 'google',
                 family: 'gemini-3-flash'
             });
 
-            if (!model) {
-                this.outputChannel.appendLine("Gemini: Built-in Gemini 3 Flash model not found. Falling back to default.");
+            // Fallback: If not found, try a broader search and log available models
+            if (models.length === 0) {
+                this.outputChannel.appendLine("Gemini: Preferred model (google/gemini-3-flash) not found. Listing all available models:");
+                const allModels = await vscode.lm.selectChatModels({});
+                for (const m of allModels) {
+                    this.outputChannel.appendLine(` - ID: ${m.id}, Vendor: ${m.vendor}, Family: ${m.family}`);
+                }
+
+                // If any google model exists, take the first one as fallback
+                const googleModels = allModels.filter(m => m.vendor === 'google');
+                if (googleModels.length > 0) {
+                    this.outputChannel.appendLine(`Gemini: Falling back to ${googleModels[0].id}`);
+                    models = [googleModels[0]];
+                }
+            }
+
+            if (models.length === 0) {
+                this.outputChannel.appendLine("Gemini: No suitable built-in models found.");
                 return null;
             }
+
+            const model = models[0];
 
             const prompt = `You are a developer assistant helping to "handoff" work to an autonomous agent.
 Analyze the following workspace state and summarize what the user is currently working on in ONE CONCISE SENTENCE.

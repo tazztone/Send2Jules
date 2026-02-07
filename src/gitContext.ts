@@ -220,12 +220,21 @@ export class GitContextManager {
 
             this.outputChannel.appendLine(`Creating and pushing to new branch: ${remoteName}/${newBranchName}...`);
 
+            // Save the current branch to return to it later
+            const originalBranch = repo.state.HEAD?.name;
+
             // Create and checkout new branch
             await repo.createBranch(newBranchName, true);
 
             // Push the new branch to remote with upstream tracking
             await repo.push(remoteName, newBranchName, true);
             this.outputChannel.appendLine("Push complete.");
+
+            // Return to the original branch if it exists
+            if (originalBranch && originalBranch !== newBranchName) {
+                this.outputChannel.appendLine(`Restoring original branch: ${originalBranch}`);
+                await repo.checkout(originalBranch);
+            }
         } catch (error: any) {
             this.outputChannel.appendLine(`Error in pushWipChanges: ${error}`);
 
