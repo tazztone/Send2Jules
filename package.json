@@ -15,8 +15,14 @@
     "categories": [
         "Other"
     ],
+    "extensionDependencies": [
+        "vscode.git"
+    ],
     "activationEvents": [
-        "workspaceContains:.git"
+        "workspaceContains:.git",
+        "onCommand:julesBridge.sendFlow",
+        "onCommand:julesBridge.setApiKey",
+        "onCommand:julesBridge.submitPrompt"
     ],
     "main": "./out/extension.js",
     "contributes": {

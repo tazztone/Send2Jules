@@ -92,8 +92,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     if (!antigravityDetector.isAntigravityEnvironment()) {
         const warningMessage = antigravityDetector.getWarningMessage();
-        outputChannel.appendLine(`[ERROR] ${warningMessage}`);
-        outputChannel.appendLine("Extension will not be activated.");
+        outputChannel.appendLine(`[WARNING] ${warningMessage}`);
+        outputChannel.appendLine("Extension will continue with limited functionality.");
 
         // Show warning to user (only once per session)
         vscode.window.showWarningMessage(
@@ -111,8 +111,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         });
 
-        // Exit activation early - do not register commands or UI
-        return;
+        // DO NOT return early - register commands so they are available
     }
 
     outputChannel.appendLine("[SUCCESS] Running in Antigravity IDE. Proceeding with activation...");
