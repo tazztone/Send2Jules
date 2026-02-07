@@ -5,7 +5,7 @@ suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
 
     test('Extension should be present', () => {
-        assert.ok(vscode.extensions.getExtension('enterprise-integration.antigravity-jules-bridge'));
+        assert.ok(vscode.extensions.getExtension('antigravity-jules-bridge.antigravity-jules-bridge'));
     });
 
     test('Commands should be registered', async () => {

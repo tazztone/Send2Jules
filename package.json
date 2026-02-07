@@ -36,6 +36,19 @@
             }
         ],
         "menus": {
+            "editor/context": [
+                {
+                    "command": "julesBridge.sendFlow",
+                    "group": "navigation",
+                    "when": "editorTextFocus"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "julesBridge.sendFlow",
+                    "group": "navigation"
+                }
+            ],
             "editor/title": [
                 {
                     "command": "julesBridge.submitPrompt",
@@ -61,6 +74,7 @@
         "watch": "tsc -watch -p ./",
         "test": "npm run compile && node ./out/test/runTest.js",
         "test:unit": "npm run compile && mocha --ui tdd --require ./out/test/unit-tests-runner.js ./out/test/suite/validators.test.js ./out/test/suite/promptGenerator.test.js ./out/test/suite/gitContext.test.js",
+        "deploy": "./scripts/deploy.sh",
         "ovsx:publish": "npx ovsx publish"
     },
     "devDependencies": {

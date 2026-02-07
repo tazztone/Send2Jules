@@ -107,6 +107,7 @@ export const UI_CONFIG = {
     STATUS_BAR_TEXT: {
         DEFAULT: '$(rocket) Send to Jules',
         SYNCING: '$(sync~spin) Syncing...',
+        DRAFTING: '$(sparkle~spin) AI Drafting...',
         SENDING: '$(cloud-upload) Sending...',
     },
 };

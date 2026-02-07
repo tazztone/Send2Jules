@@ -57,10 +57,75 @@ suite('PromptGenerator Test Suite', () => {
 
         // Check for specific instructions
         assert.ok(prompt.includes('run `git status` and `git diff`'));
+    });
 
-        // Ensure removed sections are NOT present
-        assert.ok(!prompt.includes('<active_file>'));
-        assert.ok(!prompt.includes('<git_diff>'));
+    test('generatePrompt - with git changes', async () => {
+        const repo = {
+            state: {
+                workingTreeChanges: [{ uri: vscode.Uri.file('/path/to/modified.ts'), status: 5 }],
+                indexChanges: []
+            }
+        } as unknown as Repository;
+
+        const prompt = await promptGenerator.generatePrompt(repo);
+        assert.ok(prompt.includes('<git_diff>'));
+        // In the test, relative path might just be the full path if workspaceFolders is empty
+        assert.ok(prompt.includes('Modified:'));
+        assert.ok(prompt.includes('modified.ts'));
+    });
+
+    test('generatePrompt - with active editor', async () => {
+        const repo = {
+            state: { workingTreeChanges: [], indexChanges: [] }
+        } as unknown as Repository;
+
+        const editorStub = {
+            document: { 
+                uri: vscode.Uri.file('/path/to/active.ts'),
+                getText: () => ''
+            },
+            selection: { active: new vscode.Position(10, 5) }
+        } as unknown as vscode.TextEditor;
+
+        const prompt = await promptGenerator.generatePrompt(repo, editorStub);
+        assert.ok(prompt.includes('<active_editor>'));
+        assert.ok(prompt.includes('Active File: active.ts'));
+        assert.ok(prompt.includes('Line 11, Column 6'));
+    });
+
+    test('generatePrompt - with selection', async () => {
+        const repo = {
+            state: { workingTreeChanges: [], indexChanges: [] }
+        } as unknown as Repository;
+
+        const editorStub = {
+            document: { 
+                uri: vscode.Uri.file('/path/to/active.ts'),
+                getText: (selection: any) => 'function test() { return true; }'
+            },
+            selection: { 
+                active: new vscode.Position(0, 0),
+                isEmpty: false
+            }
+        } as unknown as vscode.TextEditor;
+
+        const prompt = await promptGenerator.generatePrompt(repo, editorStub);
+        assert.ok(prompt.includes('User Selection:'));
+        assert.ok(prompt.includes('function test()'));
+    });
+
+    test('generatePrompt - AI mission brief from artifacts', async () => {
+        const repo = {
+            state: { workingTreeChanges: [], indexChanges: [] }
+        } as unknown as Repository;
+
+        // Mock a task artifact with an unchecked item
+        sandbox.stub(promptGenerator as any, 'getArtifacts').resolves(
+            '# Task List\n- [x] Done task\n- [ ] Pending AI Feature\n- [ ] Another task'
+        );
+
+        const prompt = await promptGenerator.generatePrompt(repo);
+        assert.ok(prompt.includes('<mission_brief>Continue working on: Pending AI Feature</mission_brief>'));
     });
 
     test('generatePrompt - with diagnostics', async () => {

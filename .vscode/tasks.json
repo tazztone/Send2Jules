@@ -9,6 +9,16 @@
             ],
             "group": "build",
             "label": "npm: compile"
+        },
+        {
+            "type": "npm",
+            "script": "deploy",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "label": "npm: deploy"
         }
     ]
 }

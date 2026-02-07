@@ -2,34 +2,31 @@
 
 ## Basic Workflow
 
-1. **Make Changes**: Work on your code as normal
-2. **Click "Send to Jules"**: Click the rocket icon (🚀) in the status bar
-3. **Select Context** (optional): Choose which Antigravity conversation to continue from
-4. **Review Prompt**: Review the auto-generated prompt or customize it
-5. **Click OK**: Jules session is created and you'll get a link to the dashboard
+1. **Make Changes**: Work on your code as normal.
+2. **Trigger Handoff**: 
+   - Click the rocket icon (🚀) in the **status bar**.
+   - **Right-click** in the editor and select **"Send to Jules"**.
+   - **Right-click** a file or folder in the explorer sidebar and select **"Send to Jules"**.
+3. **AI Drafting**: Observe the progress bar while **Gemini 3 Flash Preview** generates a mission brief for you.
+4. **Review Prompt**: The `JULES_PROMPT.md` file will open. Review the AI-generated brief and context.
+5. **Send**: Click the **"Validate and Send"** button at the top right of the editor.
 
 ## Features
 
-### 🚀 One-Click Handoff
-- Click the "Send to Jules" button in the status bar to instantly hand off your work
-- Auto-generated prompts based on workspace analysis mean less manual context writing
+### 🚀 Smart Handoff
+- **AI Mission Briefing**: Uses Gemini 3 Flash to automatically summarize your uncommitted changes and intent.
+- **Context Menu Integration**: Trigger handoffs from anywhere in the IDE for a faster workflow.
 
 ### 📝 Intelligent Context Awareness
-- **Git Diff Analysis**: Automatically detects modified, added, and deleted files
-- **Cursor Context**: Identifies the function/class you're currently editing
-- **Artifact Integration**: Reads Antigravity conversation artifacts (`task.md`, `implementation_plan.md`)
-- **Open Files**: Lists files you have open for additional context
+- **Selection Support**: Highlight a specific code snippet before sending to Jules. The extension will wrap it in a `<user_selection>` block so Jules knows exactly what to focus on.
+- **Git Diff Summary**: Automatically includes a list of modified files.
+- **Symbol Context**: Identifies the Class or Method your cursor is currently in using LSP.
+- **Artifact Integration**: Automatically finds and includes Antigravity `task.md` and `implementation_plan.md`.
 
 ### 🔄 Automatic Git Sync
-- Automatically stages, commits, and pushes uncommitted changes as a WIP (Work In Progress) branch
-- Creates timestamped branches like `wip-jules-2024-01-15T10-30-45-123Z`
-- Never affects your current working branch
-
-### 🗂️ Conversation Context Selection
-- Browse and select from previous Antigravity agent conversations
-- Continue work from a specific conversation's context
-- Auto-discovery of latest conversation if not specified
-
+- Automatically stages, commits, and pushes uncommitted changes to a unique WIP branch.
+- Uses **window progress notifications** so you can see the sync status in real-time.
+- Never affects your main branch.
 ## Command Palette
 
 - **Send to Jules**: `julesBridge.sendFlow` - Main handoff command

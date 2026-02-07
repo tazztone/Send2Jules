@@ -11,8 +11,15 @@ async function main() {
         // Passed to --extensionTestsPath
         const extensionTestsPath = path.resolve(__dirname, './suite/index');
 
-        // Download VS Code, unzip it and run the integration test
-        await runTests({ extensionDevelopmentPath, extensionTestsPath });
+        // Path to the Antigravity executable found on the system
+        const vscodeExecutablePath = '/usr/bin/antigravity';
+
+        // Run the integration test using Antigravity
+        await runTests({ 
+            vscodeExecutablePath,
+            extensionDevelopmentPath, 
+            extensionTestsPath 
+        });
     } catch (err) {
         console.error('Failed to run tests');
         process.exit(1);

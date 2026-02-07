@@ -5,6 +5,7 @@
             "name": "Run Extension",
             "type": "extensionHost",
             "request": "launch",
+            "runtimeExecutable": "/usr/bin/antigravity",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ],

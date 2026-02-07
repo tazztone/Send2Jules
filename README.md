@@ -7,10 +7,11 @@ A VS Code extension that enables seamless handoff of development work to the [Ju
 
 ## ✨ Features
 
-- **🚀 One-Click Handoff**: Instantly send your work to Jules.
-- **📝 Intelligent Context**: Captures git diffs, cursor position, and open files.
-- **🔄 Automatic Git Sync**: Handles WIP commits and branches automatically.
-- **🗂️ Conversation Awareness**: Integrates with Antigravity agent conversations.
+- **🚀 One-Click Handoff**: Instantly send your work to Jules via Status Bar or Context Menu.
+- **✨ AI-Driven Drafting**: Uses **Gemini 3 Flash Preview** to automatically summarize your changes into a mission brief.
+- **📝 Intelligent Context**: Captures git diffs, cursor position, code selections, and open files.
+- **🔄 Automatic Git Sync**: Handles WIP commits and branches automatically with real-time progress.
+- **🗂️ Conversation Awareness**: Integrates with Antigravity agent conversation artifacts.
 - **🔒 Secure**: API keys stored safely in OS keychain.
 
 ## 📚 Documentation

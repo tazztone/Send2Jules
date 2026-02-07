@@ -4,35 +4,40 @@ import * as sinon from 'sinon';
 // Mock vscode module
 const vscodeMock = {
     window: {
-        createOutputChannel: sinon.stub().returns({
-            append: sinon.stub(),
-            appendLine: sinon.stub(),
-            replace: sinon.stub(),
-            clear: sinon.stub(),
-            show: sinon.stub(),
-            hide: sinon.stub(),
-            dispose: sinon.stub(),
+        createOutputChannel: () => ({
+            append: () => { },
+            appendLine: () => { },
+            replace: () => { },
+            clear: () => { },
+            show: () => { },
+            hide: () => { },
+            dispose: () => { },
             name: 'Mock Channel'
         }),
-        showInformationMessage: sinon.stub(),
-        showErrorMessage: sinon.stub(),
+        showInformationMessage: () => { },
+        showErrorMessage: () => { },
+        withProgress: (options: any, task: any) => task(),
         activeTextEditor: undefined,
         tabGroups: { all: [] }
     },
     workspace: {
         workspaceFolders: [],
-        getConfiguration: sinon.stub().returns({
-            get: sinon.stub(),
-            update: sinon.stub()
+        getConfiguration: () => ({
+            get: () => { },
+            update: () => { }
         }),
-        openTextDocument: sinon.stub()
+        openTextDocument: () => { }
     },
     extensions: {
-        getExtension: sinon.stub()
+        getExtension: () => { }
+    },
+    languages: {
+        getDiagnostics: () => { }
     },
     commands: {
-        getCommands: sinon.stub(),
-        registerCommand: sinon.stub()
+        getCommands: () => { },
+        registerCommand: () => { },
+        executeCommand: () => { }
     },
     Uri: {
         file: (path: string) => ({ fsPath: path, scheme: 'file', toString: () => `file://${path}` }),
@@ -42,7 +47,31 @@ const vscodeMock = {
         constructor(public line: number, public character: number) { }
     },
     Range: class {
-        constructor(public start: any, public end: any) { }
+        public start: any;
+        public end: any;
+        constructor(arg1: any, arg2: any, arg3?: any, arg4?: any) {
+            if (typeof arg1 === 'number' && typeof arg2 === 'number' && typeof arg3 === 'number' && typeof arg4 === 'number') {
+                this.start = { line: arg1, character: arg2 };
+                this.end = { line: arg3, character: arg4 };
+            } else {
+                this.start = arg1;
+                this.end = arg2;
+            }
+        }
+    },
+    Diagnostic: class {
+        constructor(public range: any, public message: string, public severity: number) { }
+    },
+    DiagnosticSeverity: {
+        Error: 0,
+        Warning: 1,
+        Information: 2,
+        Hint: 3
+    },
+    SymbolKind: {
+        Class: 4,
+        Method: 5,
+        Function: 11
     },
     OutputChannel: class { }
 };

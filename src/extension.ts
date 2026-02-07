@@ -25,6 +25,7 @@ import { GitContextManager } from './gitContext';
 import { SecretsManager } from './secrets';
 import { PromptGenerator } from './promptGenerator';
 import { AntigravityDetector } from './antigravityDetector';
+import { GeminiClient } from './geminiClient';
 import { ProjectNotInitializedError, ValidationError, ApiError, ConfigurationError, SecurityError } from './errors';
 import { UI_CONFIG, MESSAGES, URLS, PATHS } from './constants';
 import { validateUrl } from './validators';
@@ -54,13 +55,9 @@ let pendingSessionContext: PendingSessionContext | undefined;
  * Extension activation function called by VS Code when the extension is activated.
  * 
  * This function:
- * 1. Initializes core managers (Git, Secrets, Jules Client, Prompt Generator)
+ * 1. Initializes core managers (Git, Secrets, Jules Client, Prompt Generator, Gemini Client)
  * 2. Creates a status bar button for quick access
- * 3. Registers two commands:
- *    - `julesBridge.setApiKey`: Configure Jules API key
- *    - `julesBridge.sendFlow`: Main handoff command
- * 
- * The extension activates when a workspace contains a `.git` directory.
+ * 3. Registers commands
  * 
  * @param context - VS Code extension context for managing subscriptions and lifecycle
  */
@@ -73,35 +70,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // ============================================================
     // ANTIGRAVITY ENVIRONMENT VALIDATION
     // ============================================================
-    // This extension is designed exclusively for the Antigravity IDE.
-    // It requires access to Antigravity conversation artifacts and
-    // infrastructure that are not available in regular VS Code.
-
     const antigravityDetector = new AntigravityDetector();
-    const detectionDetails = antigravityDetector.getDetectionDetails();
-
-    // Log detection details for debugging
-    outputChannel.appendLine("=== Antigravity Environment Detection ===");
-    outputChannel.appendLine(`App Name: ${detectionDetails.appName}`);
-    outputChannel.appendLine(`Brain Directory: ${detectionDetails.brainDirectoryPath}`);
-    outputChannel.appendLine(`Brain Directory Exists: ${detectionDetails.hasBrainDirectory}`);
-    outputChannel.appendLine(`App Name Match: ${detectionDetails.isAntigravityAppName}`);
-    outputChannel.appendLine(`Env Vars Match: ${detectionDetails.hasAntigravityEnvVars}`);
-    outputChannel.appendLine(`Is Antigravity: ${detectionDetails.isAntigravity}`);
-    outputChannel.appendLine("=========================================");
-
     if (!antigravityDetector.isAntigravityEnvironment()) {
         const warningMessage = antigravityDetector.getWarningMessage();
         outputChannel.appendLine(`[ERROR] ${warningMessage}`);
-        outputChannel.appendLine("Extension will not be activated.");
-
-        // Show warning to user (only once per session)
-        vscode.window.showWarningMessage(
-            warningMessage,
-            MESSAGES.LEARN_MORE
-        ).then(selection => {
+        
+        vscode.window.showWarningMessage(warningMessage, MESSAGES.LEARN_MORE).then(selection => {
             if (selection === MESSAGES.LEARN_MORE) {
-                // SECURITY: Validate URL before opening
                 try {
                     validateUrl(URLS.ANTIGRAVITY_INFO, ['deepmind.google']);
                     vscode.env.openExternal(vscode.Uri.parse(URLS.ANTIGRAVITY_INFO));
@@ -110,17 +85,14 @@ export async function activate(context: vscode.ExtensionContext) {
                 }
             }
         });
-
-        // Exit activation early - do not register commands or UI
         return;
     }
-
-    outputChannel.appendLine("[SUCCESS] Running in Antigravity IDE. Proceeding with activation...");
 
     const secrets = new SecretsManager(context);
     const gitManager = new GitContextManager(outputChannel);
     const julesClient = new JulesClient(secrets);
-    const promptGenerator = new PromptGenerator(outputChannel);
+    const geminiClient = new GeminiClient(secrets);
+    const promptGenerator = new PromptGenerator(outputChannel, geminiClient);
 
     // Initialize UI
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, UI_CONFIG.STATUS_BAR_PRIORITY);
@@ -131,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(statusBarItem);
 
     // Helper to update status bar state
-    const updateStatusBar = (state: 'default' | 'pending' | 'syncing' | 'sending') => {
+    const updateStatusBar = (state: 'default' | 'pending' | 'syncing' | 'drafting' | 'sending') => {
         switch (state) {
             case 'default':
                 statusBarItem.text = UI_CONFIG.STATUS_BAR_TEXT.DEFAULT;
@@ -145,6 +117,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 break;
             case 'syncing':
                 statusBarItem.text = UI_CONFIG.STATUS_BAR_TEXT.SYNCING;
+                break;
+            case 'drafting':
+                statusBarItem.text = UI_CONFIG.STATUS_BAR_TEXT.DRAFTING;
                 break;
             case 'sending':
                 statusBarItem.text = UI_CONFIG.STATUS_BAR_TEXT.SENDING;
@@ -202,8 +177,13 @@ export async function activate(context: vscode.ExtensionContext) {
                 const autoPush = config.get('autoPush');
 
                 if (autoPush) {
-                    updateStatusBar('syncing');
-                    await gitManager.pushWipChanges(repoDetails.repo);
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: "Syncing changes to Jules...",
+                        cancellable: false
+                    }, async () => {
+                        await gitManager.pushWipChanges(repoDetails.repo);
+                    });
                 } else {
                     const choice = await vscode.window.showWarningMessage(
                         MESSAGES.UNCOMMITTED_CHANGES,
@@ -211,8 +191,13 @@ export async function activate(context: vscode.ExtensionContext) {
                         MESSAGES.CANCEL
                     );
                     if (choice === MESSAGES.PUSH_CONTINUE) {
-                        updateStatusBar('syncing');
-                        await gitManager.pushWipChanges(repoDetails.repo);
+                        await vscode.window.withProgress({
+                            location: vscode.ProgressLocation.Notification,
+                            title: "Syncing changes to Jules...",
+                            cancellable: false
+                        }, async () => {
+                            await gitManager.pushWipChanges(repoDetails.repo);
+                        });
                     } else {
                         return;
                     }
@@ -348,7 +333,8 @@ export async function activate(context: vscode.ExtensionContext) {
      * Submits the prompt from the active editor to Jules.
      */
     context.subscriptions.push(vscode.commands.registerCommand('julesBridge.submitPrompt', async () => {
-        if (!pendingSessionContext) {
+        const currentContext = pendingSessionContext;
+        if (!currentContext) {
             vscode.window.showErrorMessage(MESSAGES.NO_PENDING_SESSION);
             return;
         }
@@ -357,20 +343,25 @@ export async function activate(context: vscode.ExtensionContext) {
             outputChannel.appendLine("Command 'submitPrompt' triggered");
 
             // Read content from the prompt file
-            if (!fs.existsSync(pendingSessionContext.promptFilePath)) {
+            if (!fs.existsSync(currentContext.promptFilePath)) {
                 throw new Error('Prompt file not found');
             }
-            const userPrompt = fs.readFileSync(pendingSessionContext.promptFilePath, 'utf8');
+            const userPrompt = fs.readFileSync(currentContext.promptFilePath, 'utf8');
 
             // 5. Commission Agent
             // Create a new Jules session via the Google Jules API
-            updateStatusBar('sending');
-            const session = await julesClient.createSession(
-                pendingSessionContext.repoDetails.owner,
-                pendingSessionContext.repoDetails.name,
-                pendingSessionContext.repoDetails.branch,
-                userPrompt
-            );
+            const session = await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: "Creating Jules Session...",
+                cancellable: false
+            }, async () => {
+                return await julesClient.createSession(
+                    currentContext.repoDetails.owner,
+                    currentContext.repoDetails.name,
+                    currentContext.repoDetails.branch,
+                    userPrompt
+                );
+            });
 
             // 6. Success & Link
             // Show success message with link to Jules dashboard
@@ -394,7 +385,7 @@ export async function activate(context: vscode.ExtensionContext) {
             // Cleanup
             // Close the prompt file editor if it's open
             for (const editor of vscode.window.visibleTextEditors) {
-                if (editor.document.uri.fsPath === pendingSessionContext.promptFilePath) {
+                if (editor.document.uri.fsPath === currentContext.promptFilePath) {
                     await vscode.window.showTextDocument(editor.document);
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
                 }
@@ -402,7 +393,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // Delete the temporary file
             try {
-                fs.unlinkSync(pendingSessionContext.promptFilePath);
+                fs.unlinkSync(currentContext.promptFilePath);
             } catch (e) {
                 outputChannel.appendLine(`Warning: Could not delete prompt file: ${e}`);
             }

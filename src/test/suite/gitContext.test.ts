@@ -35,7 +35,7 @@ suite('GitContextManager Test Suite', () => {
             }
         };
 
-        (vscode.extensions.getExtension as unknown as sinon.SinonStub).withArgs('vscode.git').returns(gitExtensionStub);
+        sandbox.stub(vscode.extensions, 'getExtension').withArgs('vscode.git').returns(gitExtensionStub as any);
 
         gitContextManager = new GitContextManager(outputChannelStub as unknown as vscode.OutputChannel);
     });

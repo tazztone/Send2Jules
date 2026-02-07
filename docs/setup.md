@@ -12,17 +12,23 @@
 4. **GitHub Integration**:
    - Jules GitHub App installed for your repositories ([Configure here](https://jules.google.com/))
 
-## Install Extension
+## Install Extension (Developers)
 
-1. Download the extension from the VS Code Marketplace (or install from `.vsix` file)
-2. Reload VS Code
-3. Open a folder that contains a Git repository
+If you are modifying the extension, you can use the automated deployment script to install your changes into Antigravity:
+
+1. **Build and Install**:
+   ```bash
+   npm run deploy
+   ```
+   This command compiles the code, packages it as a `.vsix`, and force-installs it into your local Antigravity instance.
+2. **Reload Antigravity**: Click the "Reload Required" notification in the IDE.
 
 ## Configure API Key
 
 1. Run command: `Jules Bridge: Set Jules API Key` (Cmd/Ctrl+Shift+P)
 2. Enter your Jules API key
-3. The key is securely stored in your OS keychain
+3. The key is securely stored in your OS keychain.
+4. **Note**: The same key is used for both the Jules Agent and the **Gemini 3 Flash Preview** drafting features.
 
 ## Configuration Settings
 

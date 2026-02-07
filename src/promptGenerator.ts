@@ -25,6 +25,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { validatePathInBrainDirectory } from './validators';
 import { CODE_ANALYSIS, GitStatus, PATHS, LOG_PREFIX, VALIDATION } from './constants';
+import { GeminiClient } from './geminiClient';
 
 /**
  * Summary of Git repository changes including modified, added, and deleted files.
@@ -47,9 +48,11 @@ export interface DiffSummary {
  */
 export class PromptGenerator {
     private outputChannel: vscode.OutputChannel;
+    private geminiClient?: GeminiClient;
 
-    constructor(outputChannel: vscode.OutputChannel) {
+    constructor(outputChannel: vscode.OutputChannel, geminiClient?: GeminiClient) {
         this.outputChannel = outputChannel;
+        this.geminiClient = geminiClient;
     }
 
     /**
@@ -176,24 +179,52 @@ export class PromptGenerator {
      * This is the main entry point that combines multiple context sources:
      * 1. Active errors (diagnostics)
      * 2. Antigravity artifacts (task.md, implementation_plan.md)
+     * 3. Git diff summary
+     * 4. Active editor context (file, cursor, symbol)
      * 
      * The generated prompt uses an XML structure to provide clear context to Jules.
      * 
-     * @param repo - Git repository object (unused in new strategy but kept for interface compatibility)
-     * @param activeEditor - Currently active text editor (unused in new strategy but kept for interface compatibility)
+     * @param repo - Git repository object
+     * @param activeEditor - Currently active text editor
      * @param contextPath - Specific conversation context path to use (optional, defaults to latest)
      * @returns Generated prompt string ready for Jules API
      */
-    async generatePrompt(repo: Repository, activeEditor?: vscode.TextEditor, contextPath?: string): Promise<string> {
+    async generatePrompt(
+        repo: Repository, 
+        activeEditor?: vscode.TextEditor, 
+        contextPath?: string
+    ): Promise<string> {
         try {
             // Execute context gathering in parallel
-            const [errors, artifacts] = await Promise.all([
+            const [errors, artifacts, diff, activeFileContext, openFiles] = await Promise.all([
                 this.getDiagnostics(),
-                this.getOpenFilesContext(contextPath)
+                this.getArtifacts(contextPath),
+                this.getGitDiff(repo),
+                this.getActiveEditorContext(activeEditor),
+                this.getOpenFilesList()
             ]);
 
+            // Optional: Use Gemini to generate a smart summary if client is available
+            let smartSummary: string | undefined;
+            if (this.geminiClient) {
+                try {
+                    smartSummary = await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Window,
+                        title: "Gemini 3 Flash Preview is drafting your mission brief..."
+                    }, async () => {
+                        return await this.geminiClient!.summarizeWork(
+                            diff, 
+                            errors, 
+                            activeEditor?.document.fileName || null
+                        ) || undefined;
+                    });
+                } catch (e) {
+                    this.outputChannel.appendLine(`Smart summary generation failed: ${e}`);
+                }
+            }
+
             // Assemble XML parts
-            return this.assemblePrompt(errors, artifacts);
+            return this.assemblePrompt(errors, artifacts, diff, activeFileContext, openFiles, smartSummary);
         } catch (error) {
             this.outputChannel.appendLine(`Error generating prompt: ${error}`);
             return `<instruction>Continue working on this project</instruction>
@@ -201,6 +232,77 @@ export class PromptGenerator {
 </workspace_context>
 <mission_brief>[Describe your task here...]</mission_brief>`;
         }
+    }
+
+    /**
+     * Get Git diff summary for the current repository.
+     */
+    private async getGitDiff(repo: Repository): Promise<string | null> {
+        try {
+            const changes = [
+                ...repo.state.workingTreeChanges,
+                ...repo.state.indexChanges
+            ];
+
+            if (changes.length === 0) return null;
+
+            const summary = changes.map(change => {
+                const status = this.getGitStatusString(change.status);
+                const filePath = change.uri.fsPath;
+                // Try to make path relative to workspace
+                let displayPath = filePath;
+                if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+                    const rootPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+                    if (filePath.startsWith(rootPath)) {
+                        displayPath = path.relative(rootPath, filePath);
+                    }
+                }
+                return `${status}: ${displayPath}`;
+            }).join('\n');
+
+            return `Modified Files:\n${summary}`;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    private getGitStatusString(status: number): string {
+        switch (status) {
+            case GitStatus.INDEX_MODIFIED: return 'Modified (staged)';
+            case GitStatus.MODIFIED: return 'Modified';
+            case GitStatus.INDEX_ADDED: return 'Added (staged)';
+            case GitStatus.UNTRACKED: return 'Untracked';
+            case GitStatus.INDEX_DELETED: return 'Deleted (staged)';
+            case GitStatus.DELETED: return 'Deleted';
+            default: return 'Changed';
+        }
+    }
+
+    /**
+     * Get context about the active editor.
+     */
+    private async getActiveEditorContext(editor?: vscode.TextEditor): Promise<string | null> {
+        if (!editor) return null;
+
+        const fileName = this.getFileName(editor.document.uri);
+        const position = editor.selection.active;
+        const symbolContext = await this.getDeepSymbolContext(editor);
+        const selectedText = editor.document.getText(editor.selection);
+        
+        let context = `Active File: ${fileName}\nCursor Position: Line ${position.line + 1}, Column ${position.character + 1}`;
+        if (symbolContext) {
+            context += `\nSymbol Context: ${symbolContext}`;
+        }
+
+        if (selectedText && selectedText.trim().length > 0) {
+            // Limit selection size
+            const displaySelection = selectedText.length > 2000 
+                ? selectedText.substring(0, 1900) + "\n\n[... Selection truncated ...]"
+                : selectedText;
+            context += `\n\nUser Selection:\n\"\"\"\n${displaySelection}\n\"\"\"`;
+        }
+
+        return context;
     }
 
     /**
@@ -292,9 +394,26 @@ export class PromptGenerator {
     }
 
     /**
-     * Get list of open files and include artifact content.
+     * Get list of all open files in tab groups.
      */
-    private async getOpenFilesContext(specificContextPath?: string): Promise<string | null> {
+    private async getOpenFilesList(): Promise<string[]> {
+        const fileNames: string[] = [];
+        const tabs = vscode.window.tabGroups.all.flatMap(group => group.tabs);
+
+        for (const tab of tabs) {
+            if (tab.input && typeof tab.input === 'object' && tab.input !== null && 'uri' in tab.input) {
+                const uri = (tab.input as any).uri as vscode.Uri;
+                fileNames.push(this.getFileName(uri));
+            }
+        }
+
+        return [...new Set(fileNames)];
+    }
+
+    /**
+     * Get artifacts content.
+     */
+    private async getArtifacts(specificContextPath?: string): Promise<string | null> {
         try {
             const artifactContent: string[] = [];
             const processedArtifactPaths = new Set<string>();
@@ -330,7 +449,7 @@ export class PromptGenerator {
 
             return artifactContent.length > 0 ? artifactContent.join('\n\n') : null;
         } catch (error) {
-            this.outputChannel.appendLine(`Error getting open files: ${error}`);
+            this.outputChannel.appendLine(`Error getting artifacts: ${error}`);
             return null;
         }
     }
@@ -406,55 +525,92 @@ export class PromptGenerator {
     }
 
     /**
+     * Summarize the current intent based on artifacts and workspace state.
+     */
+    private summarizeCurrentIntent(
+        artifacts: string | null, 
+        activeFileContext: string | null, 
+        diff: string | null,
+        smartSummary?: string
+    ): string {
+        // Priority 1: AI-generated smart summary
+        if (smartSummary) return smartSummary;
+
+        const placeholder = "[Describe your task here...]";
+        
+        // Strategy 2: Look for first unchecked task in task.md
+        if (artifacts) {
+            const taskMatch = artifacts.match(/- \[ \] (.*)/);
+            if (taskMatch && taskMatch[1]) {
+                return `Continue working on: ${taskMatch[1].trim()}`;
+            }
+        }
+
+        // Strategy 3: Infer from active file and diff
+        if (activeFileContext && diff) {
+            const fileMatch = activeFileContext.match(/Active File: (.*)/);
+            if (fileMatch && fileMatch[1]) {
+                const fileName = fileMatch[1];
+                if (diff.includes(fileName)) {
+                    return `Finish implementation of changes in ${fileName}`;
+                }
+            }
+        }
+
+        return placeholder;
+    }
+
+    /**
      * Assemble the final prompt XML with budget management.
      */
-    private assemblePrompt(errors: string | null, artifacts: string | null): string {
+    private assemblePrompt(
+        errors: string | null, 
+        artifacts: string | null, 
+        diff: string | null, 
+        activeFileContext: string | null, 
+        openFiles: string[],
+        smartSummary?: string
+    ): string {
         const instruction = "You are an expert software engineer. You are working on a WIP branch. Please run `git status` and `git diff` to understand the changes and the current state of the code. Analyze the workspace context and complete the mission brief.";
-        const missionBriefPlaceholder = "[Describe your task here...]";
+        const missionBrief = this.summarizeCurrentIntent(artifacts, activeFileContext, diff, smartSummary);
 
         const maxLen = VALIDATION.PROMPT_MAX_LENGTH;
 
         const baseStart = `<instruction>${instruction}</instruction>\n<workspace_context>\n`;
-        const baseEnd = `</workspace_context>\n<mission_brief>${missionBriefPlaceholder}</mission_brief>`;
+        const baseEnd = `</workspace_context>\n<mission_brief>${missionBrief}</mission_brief>`;
 
         // Calculate available budget for context
         let currentLen = baseStart.length + baseEnd.length;
         let remainingBudget = maxLen - currentLen;
 
-        // 3. Active Errors
-        let activeErrorsStr = "";
-        if (errors) {
-            activeErrorsStr = `<active_errors>\n${errors}\n</active_errors>\n`;
-        }
-
-        // 5. Artifacts
-        let artifactsStr = "";
-        if (artifacts) {
-            artifactsStr = `<artifacts>\n${artifacts}\n</artifacts>\n`;
-        }
+        // Sections
+        let activeFileStr = activeFileContext ? `<active_editor>\n${activeFileContext}\n</active_editor>\n` : "";
+        let openFilesStr = openFiles.length > 0 ? `<open_files>\n${openFiles.join('\n')}\n</open_files>\n` : "";
+        let gitDiffStr = diff ? `<git_diff>\n${diff}\n</git_diff>\n` : "";
+        let activeErrorsStr = errors ? `<active_errors>\n${errors}\n</active_errors>\n` : "";
+        let artifactsStr = artifacts ? `<artifacts>\n${artifacts}\n</artifacts>\n` : "";
 
         // Assemble with priority
+        const sections = [
+            { name: 'Active Editor', content: activeFileStr },
+            { name: 'Artifacts', content: artifactsStr },
+            { name: 'Active Errors', content: activeErrorsStr },
+            { name: 'Git Diff', content: gitDiffStr },
+            { name: 'Open Files', content: openFilesStr }
+        ];
+
         let finalContext = "";
 
-        // Priority 3: Active Errors
-        if (activeErrorsStr.length <= remainingBudget) {
-            finalContext += activeErrorsStr;
-            remainingBudget -= activeErrorsStr.length;
-        } else {
-            if (remainingBudget > 50) {
-                finalContext += activeErrorsStr.substring(0, remainingBudget - 20) + "...</active_errors>\n";
+        for (const section of sections) {
+            if (section.content.length <= remainingBudget) {
+                finalContext += section.content;
+                remainingBudget -= section.content.length;
+            } else if (remainingBudget > 500) {
+                // Partial truncate for large sections like Git Diff or Artifacts
+                const tagName = section.content.match(/^<(\w+)>/)?.[1] || "context";
+                finalContext += section.content.substring(0, remainingBudget - 50) + `\n[... Truncated ...]\n</${tagName}>\n`;
                 remainingBudget = 0;
-            }
-        }
-
-        // Priority 5: Artifacts
-        if (artifactsStr.length <= remainingBudget) {
-            finalContext += artifactsStr;
-            remainingBudget -= artifactsStr.length;
-        } else {
-            if (remainingBudget > 50) {
-                finalContext += artifactsStr.substring(0, remainingBudget - 20) + "...</artifacts>\n";
-                remainingBudget = 0;
+                break;
             }
         }
 
