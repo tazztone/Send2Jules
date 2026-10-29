@@ -73,6 +73,16 @@ const vscodeMock = {
         Method: 5,
         Function: 11
     },
+    ProgressLocation: {
+        SourceControl: 1,
+        Window: 10,
+        Notification: 15
+    },
+    CancellationTokenSource: class {
+        token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose: () => { } }) };
+        cancel() { }
+        dispose() { }
+    },
     OutputChannel: class { }
 };
 

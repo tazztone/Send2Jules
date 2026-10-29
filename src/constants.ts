@@ -184,6 +184,7 @@ export const MESSAGES = {
     PROMPT_SUBMITTED: 'Prompt submitted to Jules.',
 
     // Warnings
+    DEPRECATION_WARNING: 'Google Jules is winding down on December 31, 2026 (read-only after November 11, 2026). This extension is deprecated; migrate workflows to Google Antigravity.',
     ANTIGRAVITY_ONLY: 'This extension requires the Antigravity IDE. ' +
         'It is designed to work with Antigravity\'s conversation artifacts ' +
         'and will not function in regular VS Code. ' +

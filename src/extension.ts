@@ -66,6 +66,19 @@ export async function activate(context: vscode.ExtensionContext) {
     const outputChannel = vscode.window.createOutputChannel("Jules Bridge");
     context.subscriptions.push(outputChannel);
     outputChannel.appendLine("Jules Bridge Extension Activating...");
+    outputChannel.appendLine(`[DEPRECATION] ${MESSAGES.DEPRECATION_WARNING}`);
+
+    // Show deprecation notice
+    vscode.window.showWarningMessage(MESSAGES.DEPRECATION_WARNING, MESSAGES.LEARN_MORE).then(selection => {
+        if (selection === MESSAGES.LEARN_MORE) {
+            try {
+                validateUrl(URLS.ANTIGRAVITY_INFO, ['deepmind.google']);
+                vscode.env.openExternal(vscode.Uri.parse(URLS.ANTIGRAVITY_INFO));
+            } catch (error) {
+                outputChannel.appendLine(`[SECURITY] URL validation failed: ${error}`);
+            }
+        }
+    });
 
     // ============================================================
     // INITIALIZE MANAGERS

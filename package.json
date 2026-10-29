@@ -1,7 +1,8 @@
 {
     "name": "antigravity-jules-bridge",
-    "displayName": "Antigravity Jules Bridge",
-    "description": "[Antigravity IDE Only] Asynchronous handoff extension to send current flow to Jules Agent.",
+    "displayName": "[DEPRECATED] Antigravity Jules Bridge",
+    "description": "[DEPRECATED] Jules winds down Dec 31, 2026 (read-only after Nov 11, 2026). Transition to Google Antigravity.",
+    "deprecated": "Google Jules is winding down on December 31, 2026 (read-only after November 11, 2026). Migrate workflows to native Google Antigravity.",
     "version": "1.0.1",
     "publisher": "antigravity-jules-bridge",
     "license": "Apache-2.0",
@@ -115,4 +116,4 @@
         "@types/sinon": "^10.0.15",
         "typescript": "^5.1.3"
     }
-}
+}
