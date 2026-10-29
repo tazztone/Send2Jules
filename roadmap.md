@@ -1,6 +1,9 @@
-# Send2Jules Project Roadmap
+# Send2Jules Project Roadmap [DEPRECATED / ARCHIVED]
 
-This document outlines the planned improvements and future features for the Send2Jules VS Code extension.
+> [!CAUTION]
+> **Project Sunset**: Development halted following Google's announcement of Jules winding down on December 31, 2026 (read-only after November 11, 2026). Unfinished roadmap items are cancelled in favor of native Google Antigravity features.
+
+This document records completed work and previously planned improvements for the Send2Jules VS Code extension.
 
 ## Phase 1: Context Enrichment (Highest Priority)
 *   [x] **Git Diff Integration**: Automatically include the current `git diff` summary in the generated XML prompt.

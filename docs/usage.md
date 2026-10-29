@@ -1,4 +1,7 @@
-# Usage Guide
+# Usage Guide [DEPRECATED]
+
+> [!WARNING]
+> **Jules Wind-Down**: Jules transitions to read-only mode after November 11, 2026 and shuts down December 31, 2026. This extension is deprecated.
 
 ## Basic Workflow
 

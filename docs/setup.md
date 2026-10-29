@@ -1,4 +1,7 @@
-# Installation & Configuration
+# Installation & Configuration [DEPRECATED]
+
+> [!WARNING]
+> **Jules Wind-Down**: Jules will enter read-only mode after November 11, 2026 and permanently shut down on December 31, 2026. This extension is deprecated. Migrate workflows to Google Antigravity.
 
 ## Prerequisites
 

@@ -1,7 +1,15 @@
-# Antigravity Jules Bridge
+# Antigravity Jules Bridge [DEPRECATED]
+
+> [!WARNING]
+> **DEPRECATION NOTICE: Jules Wind-Down**
+> As part of Google's unification of agentic coding efforts into [Google Antigravity](https://deepmind.google/technologies/antigravity/), Google Jules is winding down:
+> - **November 11, 2026**: Jules transitions to read-only mode (finish existing sessions).
+> - **December 31, 2026**: Jules winds down permanently and will no longer be included in Google AI plans.
+>
+> This extension and repository are **deprecated**. We recommend running workflows directly in Google Antigravity, which supports long-running agents, multi-agent parallel execution, and scheduled tasks.
 
 > [!IMPORTANT]
-> **Antigravity IDE Required**: This extension is designed exclusively for the [Antigravity IDE](https://antigravity.google/) and will not function in regular VS Code.
+> **Antigravity IDE Required**: This extension was designed exclusively for the [Antigravity IDE](https://antigravity.google/) and will not function in regular VS Code.
 
 A VS Code extension that enables seamless handoff of development work to the [Jules autonomous agent](https://jules.google.com). This extension intelligently captures your current workspace context—including uncommitted changes, open files, cursor position, and Antigravity conversation artifacts—to provide Jules with rich context for continuing your work.
 
